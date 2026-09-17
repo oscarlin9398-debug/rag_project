@@ -12,7 +12,7 @@ from datetime import date
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from db import init_auth_tables, init_conversation_table
 import auth
@@ -36,6 +36,11 @@ def health():
 # dashboard 靜態頁（若檔案存在）
 _dashboard_path = os.path.join(os.path.dirname(__file__), "dashboard.html")
 DASHBOARD = open(_dashboard_path, encoding="utf-8").read() if os.path.exists(_dashboard_path) else "<h1>Dashboard</h1>"
+
+
+@app.get("/", include_in_schema=False)
+def root():
+    return RedirectResponse(url="/dashboard")
 
 
 @app.get("/dashboard", include_in_schema=False)
@@ -64,3 +69,8 @@ async def _startup_prewarm_bm25():
                 print(f"⚠️ BM25 索引預建失敗（{table_name}）：{e}")
 
     threading.Thread(target=_build_all, daemon=True).start()
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=False)
