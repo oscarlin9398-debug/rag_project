@@ -53,3 +53,7 @@ export const upsertConversation = (conv) => API.put(`/api/conversations/${conv.i
 export const deleteConversationApi = (id) => API.delete(`/api/conversations/${id}`);
 export const renameConversationApi = (id, title) => API.patch(`/api/conversations/${id}/rename`, { title });
 export const pinConversationApi = (id, pinned) => API.patch(`/api/conversations/${id}/pin`, { pinned });
+
+// 多模態拍照辨識與自動更新
+export const visionDiagnose = (imageBase64, cropHint, farmerMode = true) => 
+  API.post('/api/rag/vision-diagnose', { image_base64: imageBase64, crop_hint: cropHint, farmer_mode: farmerMode });

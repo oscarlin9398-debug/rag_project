@@ -37,10 +37,21 @@ def health():
 _dashboard_path = os.path.join(os.path.dirname(__file__), "dashboard.html")
 DASHBOARD = open(_dashboard_path, encoding="utf-8").read() if os.path.exists(_dashboard_path) else "<h1>Dashboard</h1>"
 
+_frontend_build_path = os.path.join(os.path.dirname(__file__), "frontend", "build")
+if os.path.exists(_frontend_build_path):
+    from fastapi.staticfiles import StaticFiles
+    app.mount("/static", StaticFiles(directory=os.path.join(_frontend_build_path, "static")), name="static")
 
-@app.get("/", include_in_schema=False)
-def root():
-    return RedirectResponse(url="/dashboard")
+    @app.get("/", include_in_schema=False)
+    def root():
+        index_file = os.path.join(_frontend_build_path, "index.html")
+        if os.path.exists(index_file):
+            return HTMLResponse(content=open(index_file, encoding="utf-8").read())
+        return RedirectResponse(url="/dashboard")
+else:
+    @app.get("/", include_in_schema=False)
+    def root():
+        return RedirectResponse(url="/dashboard")
 
 
 @app.get("/dashboard", include_in_schema=False)

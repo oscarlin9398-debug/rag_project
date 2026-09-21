@@ -165,7 +165,7 @@ export function ChatProvider({ children }) {
   // 送出問題並取得回答。
   // 關鍵修正：回答回來後「先組好完整對話物件、await 存進後端、再更新畫面」。
   // 這樣即使使用者馬上登出，回答也已經確定寫入後端，不會出現「問題在、回答不見」的情況。
-  const send = async (convId, question) => {
+  const send = async (convId, question, customBotMessage = null) => {
     const qtext = question.trim();
     if (!qtext) return;
 
@@ -176,12 +176,30 @@ export function ChatProvider({ children }) {
       const updated = {
         ...c,
         title: !c.messages.some(m => m.role === 'user') ? makeTitle(qtext) : c.title,
-        messages: [...c.messages, { role: 'user', text: qtext }],
+        messages: [...c.messages, { role: 'user', text: qtext, image: customBotMessage?.userImage || null }],
         updatedAt: Date.now(),
       };
       baseConv = updated;
       return updated;
     }));
+
+    if (customBotMessage) {
+      const finalConv = baseConv ? {
+        ...baseConv,
+        messages: [...baseConv.messages, {
+          role: 'bot',
+          text: customBotMessage.text,
+          sources: customBotMessage.sources || [],
+          isRefusal: false,
+          crop: customBotMessage.crop,
+          pest: customBotMessage.pest,
+        }],
+        updatedAt: Date.now(),
+      } : null;
+      if (finalConv) await persist(finalConv);
+      setConversations(list => list.map(c => c.id === convId && finalConv ? finalConv : c));
+      return;
+    }
 
     setPendingIds(p => [...p, convId]);
     try {
@@ -194,7 +212,7 @@ export function ChatProvider({ children }) {
       else if (!isFollowup) lastPestRef.current = null;
       const finalConv = baseConv ? {
         ...baseConv,
-        messages: [...baseConv.messages, { role: 'bot', text: answer, sources: sources || [], isRefusal }],
+        messages: [...baseConv.messages, { role: 'bot', text: answer, sources: sources || [], isRefusal, crop, pest }],
         updatedAt: Date.now(),
       } : null;
 
