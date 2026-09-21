@@ -13,6 +13,7 @@ venv/
 # Vector Database & Local SQLite Database (built locally via build_all_databases.py)
 chroma_db/
 *.db
+*.exe
 
 # Node / Frontend
 node_modules/

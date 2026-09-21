@@ -13,12 +13,61 @@ const EARTH = {
   textMuted: '#3D4A43',
 };
 
+// 作物圖像與圖標對照表
+const CROP_ICONS = {
+  '水稻': { icon: '🌾', color: '#FEF3C7', border: '#F59E0B' },
+  '稻': { icon: '🌾', color: '#FEF3C7', border: '#F59E0B' },
+  '芒果': { icon: '🥭', color: '#FFEDD5', border: '#F97316' },
+  '檬果': { icon: '🥭', color: '#FFEDD5', border: '#F97316' },
+  '番茄': { icon: '🍅', color: '#FEE2E2', border: '#EF4444' },
+  '甘藍': { icon: '🥬', color: '#DCFCE7', border: '#22C55E' },
+  '高麗菜': { icon: '🥬', color: '#DCFCE7', border: '#22C55E' },
+  '芭樂': { icon: '🍈', color: '#ECFCCB', border: '#84CC16' },
+  '番石榴': { icon: '🍈', color: '#ECFCCB', border: '#84CC16' },
+  '茶': { icon: '🍵', color: '#D1FAE5', border: '#10B981' },
+  '蓮霧': { icon: '🍎', color: '#FFE4E6', border: '#F43F5E' },
+  '香蕉': { icon: '🍌', color: '#FEF08A', border: '#EAB308' },
+  '葡萄': { icon: '🍇', color: '#F3E8FF', border: '#A855F7' },
+  '柑橘': { icon: '🍊', color: '#FFEDD5', border: '#FB923C' },
+  '草莓': { icon: '🍓', color: '#FEE2E2', border: '#F43F5E' },
+  '蔥': { icon: '🌱', color: '#E0F2FE', border: '#38BDF8' },
+};
+
+function getCropVisual(cropName = '') {
+  for (const [k, v] of Object.entries(CROP_ICONS)) {
+    if (cropName.includes(k)) return v;
+  }
+  return { icon: '🌿', color: '#E8F5E9', border: '#4CAF50' };
+}
+
+// 依法規標準之毒性危害標籤色帶 (紅/黃/藍/綠)
+function getToxicityBadge(pesticideName = '', notes = '') {
+  if (/加保扶|好年冬|納乃得|巴拉刈|大滅松/.test(pesticideName) || /劇毒/.test(notes)) {
+    return { level: '劇毒 ☠️', bg: '#DC2626', color: '#FFFFFF', desc: '極度危險，嚴格列管' };
+  }
+  if (/中等毒/.test(notes) || /甲基多保淨/.test(pesticideName)) {
+    return { level: '中等毒 ⚠️', bg: '#EAB308', color: '#000000', desc: '警告，注意施藥防護' };
+  }
+  if (/輕毒/.test(notes) || /殺蟲/.test(notes)) {
+    return { level: '輕毒 ℹ️', bg: '#2563EB', color: '#FFFFFF', desc: '低度危險，小心使用' };
+  }
+  return { level: '普級 ✅', bg: '#16A34A', color: '#FFFFFF', desc: '安全普級，依標示施用' };
+}
+
+// 20 公升背負式噴藥桶劑量換算
+function calc20LDosage(dilutionStr) {
+  if (!dilutionStr) return null;
+  const num = parseFloat(String(dilutionStr).replace(/,/g, ''));
+  if (isNaN(num) || num <= 0) return null;
+  const ml = Math.round((20000 / num) * 10) / 10;
+  return {
+    ratio: num,
+    dosageText: `${ml} 毫升 (cc)`,
+    explanation: `20公升水桶需加 ${ml} 毫升藥劑`,
+  };
+}
+
 // 依「病蟲害名稱」推斷藥劑類型。
-// 台灣農藥登記資料沒有獨立的「藥劑類型」欄位，但病蟲害名稱的用字有規律。
-// 策略：先把「病害 / 雜草 / 蟎類」這三類判斷做紮實（用字較固定、好辨識），
-// 其餘只要是在防治某種生物、且沒對到上述三類的，絕大多數就是蟲害，
-// 因此 fallback 預設為殺蟲劑，而非籠統的「其他」，可大幅減少誤標。
-// 只有完全無法辨識（空值等）才會落到「其他」。
 function inferType(pestName) {
   const n = pestName || '';
   if (!n) return '其他';
@@ -28,9 +77,10 @@ function inferType(pestName) {
   if (/(病|菌|疫|露|銹|銹病|炭疽|白粉|灰黴|黴|萎凋|立枯|猝倒|軟腐|潰瘍|瘡痂|銹斑|葉斑|黑斑|褐斑|輪斑|角斑|腐爛|腐病|枯萎|線蟲|病毒|毒素病)/.test(n)) return '殺菌';
   // 雜草
   if (/(草|莎草|稗)/.test(n)) return '除草';
-  // 其餘防治對象視為蟲害（蚜、蟬、椿象、薊馬、飛蝨、粉蝨、蛾、蠅、甲蟲、毛蟲等）
+  // 其餘防治對象視為蟲害
   return '殺蟲';
 }
+
 
 export default function PesticideCards() {
   const [data, setData] = useState([]);
@@ -170,26 +220,80 @@ export default function PesticideCards() {
       </div>
 
       {loading ? <p style={{ color: EARTH.textMuted }}>載入中...</p> : (
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill,minmax(260px,1fr))', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill,minmax(280px,1fr))', gap: 16 }}>
           {data.filter(p => !type || inferType(p.病蟲害名稱) === type).map(p => {
             const t = inferType(p.病蟲害名稱);
+            const cropVis = getCropVisual(p.作物名稱);
+            const tox = getToxicityBadge(p.農藥中文普通名稱, p.注意事項);
+            const d20 = calc20LDosage(p.稀釋倍數);
             return (
-              <div key={p.id} onClick={() => setSelected(p)} style={{ background: typeColors[t] || EARTH.surface, border: `1.5px solid ${EARTH.border}`, borderRadius: 12, padding: '18px 20px', cursor: 'pointer', transition: 'all 0.15s' }}
-                onMouseEnter={e => { if (!isMobile) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 14px rgba(15,74,52,0.18)'; } }}
-                onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 11 }}>
-                  <span style={{ background: EARTH.accent, color: EARTH.accentText, fontSize: 13, fontWeight: 500, padding: '3px 9px', borderRadius: 5 }}>{p.作物名稱}</span>
-                  <span style={{ fontSize: 13, color: EARTH.textMuted }}>{t}劑</span>
+              <div key={p.id} onClick={() => setSelected(p)}
+                style={{
+                  background: EARTH.surface,
+                  border: `1.5px solid ${cropVis.border || EARTH.border}`,
+                  borderRadius: 14,
+                  padding: '16px 18px',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                }}
+                onMouseEnter={e => { if (!isMobile) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(15,74,52,0.14)'; } }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)'; }}>
+                
+                {/* 危害毒性等級色帶 (依法規標準分級標示) */}
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: tox.bg }} />
+
+                <div>
+                  {/* 標籤列：作物圖標 + 毒性等級 */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, marginTop: 4 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: cropVis.color, color: '#1B4332', fontSize: 13, fontWeight: 600, padding: '3px 8px', borderRadius: 6, border: `1px solid ${cropVis.border}` }}>
+                      <span>{cropVis.icon}</span> {p.作物名稱}
+                    </span>
+                    <span style={{ fontSize: 12, background: tox.bg, color: tox.color, padding: '2px 8px', borderRadius: 12, fontWeight: 700 }}>
+                      {tox.level}
+                    </span>
+                  </div>
+
+                  {/* 農藥瓶裝圖示與藥名 */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                    <div style={{ width: 44, height: 44, borderRadius: 10, background: '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0, border: '1px solid #E5E7EB' }}>
+                      🧪
+                    </div>
+                    <div>
+                      <h3 style={{ fontWeight: 700, fontSize: 18, color: EARTH.textDark, margin: '0 0 2px' }}>{p.農藥中文普通名稱}</h3>
+                      <span style={{ fontSize: 13, color: EARTH.accent, fontWeight: 500 }}>{t}劑 · {p.劑型 || '標準劑型'}</span>
+                    </div>
+                  </div>
+
+                  <p style={{ fontSize: 14, color: EARTH.textMuted, margin: '0 0 10px', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    🎯 防治對象：<strong style={{ color: EARTH.textDark }}>{p.病蟲害名稱}</strong>
+                  </p>
+
+                  {/* 視覺特色標籤：20L 噴藥桶換算 + 安全採收期時鐘 */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: p.注意事項 ? 8 : 0 }}>
+                    {d20 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, background: '#EFF6FF', border: '1px solid #BFDBFE', color: '#1E40AF', padding: '4px 8px', borderRadius: 6 }}>
+                        <span>🎒</span>
+                        <span><strong>20L 噴藥桶：</strong>加水配 <strong>{d20.dosageText}</strong></span>
+                      </div>
+                    )}
+                    {p.安全採收期_天 && p.安全採收期_天 !== '-' && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, background: '#FEF3C7', border: '1px solid #FDE68A', color: '#92400E', padding: '4px 8px', borderRadius: 6 }}>
+                        <span>⏱️</span>
+                        <span>安全採收期間隔：<strong>{p.安全採收期_天} 天</strong></span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <h3 style={{ fontWeight: 600, fontSize: 19, color: EARTH.textDark, marginBottom: 7 }}>{p.農藥中文普通名稱}</h3>
-                <p style={{ fontSize: 16, color: EARTH.textMuted, marginBottom: 10 }}>{p.病蟲害名稱}</p>
-                <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap', marginBottom: p.注意事項 ? 9 : 0 }}>
-                  {p.稀釋倍數 && <span style={{ fontSize: 13, background: EARTH.surface, border: `1px solid ${EARTH.border}`, padding: '3px 8px', borderRadius: 5 }}>加水稀釋 {p.稀釋倍數} 倍</span>}
-                  {p.安全採收期_天 && p.安全採收期_天 !== '-' && <span style={{ fontSize: 13, background: EARTH.surface, border: `1px solid ${EARTH.border}`, padding: '3px 8px', borderRadius: 5 }}>施藥後 {p.安全採收期_天} 天才能採收</span>}
-                </div>
+
                 {p.注意事項 && (
-                  <p style={{ fontSize: 13, color: EARTH.accent, background: EARTH.surface, border: `1px dashed ${EARTH.border}`, borderRadius: 7, padding: '6px 9px', margin: 0, lineHeight: 1.55 }}>
-                    ⚠️ {truncate(p.注意事項, 34)}
+                  <p style={{ fontSize: 12, color: '#B45309', background: '#FFFBEB', border: '1px dashed #FCD34D', borderRadius: 6, padding: '5px 8px', margin: '8px 0 0', lineHeight: 1.4 }}>
+                    ⚠️ {truncate(p.注意事項, 32)}
                   </p>
                 )}
               </div>
@@ -202,32 +306,86 @@ export default function PesticideCards() {
         <p style={{ color: EARTH.textMuted, marginTop: 8 }}>沒有符合條件的資料，換個作物或類型試試。</p>
       )}
 
-      {selected && (
-        <div onClick={() => setSelected(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(43,38,32,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: isMobile ? 14 : 24 }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: EARTH.surface, borderRadius: 17, padding: isMobile ? '24px 20px' : '35px', maxWidth: 580, width: '100%', maxHeight: '85vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
-              <h2 style={{ fontWeight: 700, color: EARTH.accent, fontSize: isMobile ? 22 : 25 }}>{selected.農藥中文普通名稱}</h2>
-              <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', fontSize: 25, color: EARTH.textMuted, cursor: 'pointer' }}>✕</button>
-            </div>
-            {FIELD_META.map(({ key, label, hint, unit }) => {
-              const value = selected[key];
-              if (!value || value === '-') return null;
-              const displayValue = unit && !String(value).includes(unit) ? `${value} ${unit}` : value;
-              const hintText = typeof hint === 'function' ? hint(value) : hint;
-              return (
-                <div key={key} style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 4 : 17, padding: '12px 0', borderBottom: `1px solid ${EARTH.accentLight}` }}>
-                  <span style={{ color: EARTH.textMuted, fontSize: 16, minWidth: isMobile ? 'auto' : 125 }}>
-                    {label}
-                    {hintText && <div style={{ fontSize: 13, color: EARTH.textMuted, opacity: 0.85, marginTop: 3, lineHeight: 1.55 }}>（{hintText}）</div>}
-                  </span>
-                  <span style={{ color: EARTH.textDark, fontSize: 16, flex: 1 }}>{displayValue}</span>
+      {selected && (() => {
+        const cropVis = getCropVisual(selected.作物名稱);
+        const tox = getToxicityBadge(selected.農藥中文普通名稱, selected.注意事項);
+        const d20 = calc20LDosage(selected.稀釋倍數);
+        return (
+          <div onClick={() => setSelected(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(43,38,32,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: isMobile ? 14 : 24 }}>
+            <div onClick={e => e.stopPropagation()} style={{ background: EARTH.surface, borderRadius: 18, padding: isMobile ? '20px 16px' : '32px', maxWidth: 640, width: '100%', maxHeight: '88vh', overflowY: 'auto', boxShadow: '0 20px 50px rgba(0,0,0,0.3)' }}>
+              
+              {/* 頂部彩色毒性標籤列 */}
+              <div style={{ background: tox.bg, color: tox.color, borderRadius: 8, padding: '8px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, fontWeight: 600, fontSize: 14 }}>
+                <span>標籤毒性分級：{tox.level}</span>
+                <span>{tox.desc}</span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                <div>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: cropVis.color, color: '#1B4332', fontSize: 14, fontWeight: 600, padding: '3px 10px', borderRadius: 6, marginBottom: 8, border: `1px solid ${cropVis.border}` }}>
+                    <span>{cropVis.icon}</span> 適用作物：{selected.作物名稱}
+                  </div>
+                  <h2 style={{ fontWeight: 800, color: EARTH.accent, fontSize: isMobile ? 24 : 28, margin: 0 }}>{selected.農藥中文普通名稱}</h2>
                 </div>
-              );
-            })}
-            <div style={{ marginTop: 18, fontSize: 14, color: EARTH.textMuted }}>資料來源：農藥資訊服務網 2026 版</div>
+                <button onClick={() => setSelected(null)} style={{ background: '#F3F4F6', border: 'none', width: 36, height: 36, borderRadius: 18, fontSize: 18, color: EARTH.textMuted, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+              </div>
+
+              {/* 田間施藥調配速查圖卡 */}
+              <div style={{ background: '#F0FDF4', border: '1.5px solid #BBF7D0', borderRadius: 12, padding: '14px 16px', marginBottom: 20 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#166534', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  🎒 田間施藥速查指南 (20公升噴藥桶)
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 10, fontSize: 14 }}>
+                  <div style={{ background: '#FFFFFF', padding: '10px', borderRadius: 8, border: '1px solid #DCFCE7' }}>
+                    <div style={{ color: '#4B5563', fontSize: 12 }}>背負式噴藥桶加藥量</div>
+                    <div style={{ color: '#15803D', fontWeight: 700, fontSize: 16, marginTop: 2 }}>
+                      {d20 ? d20.dosageText : '依標籤倍數計算'}
+                    </div>
+                  </div>
+                  <div style={{ background: '#FFFFFF', padding: '10px', borderRadius: 8, border: '1px solid #DCFCE7' }}>
+                    <div style={{ color: '#4B5563', fontSize: 12 }}>安全採收期 (PHI)</div>
+                    <div style={{ color: '#B45309', fontWeight: 700, fontSize: 16, marginTop: 2 }}>
+                      {selected.安全採收期_天 && selected.安全採收期_天 !== '-' ? `施藥後 ${selected.安全採收期_天} 天` : '未特別限制'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 防護裝備圖標列 */}
+                <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px dashed #BBF7D0', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', fontSize: 13, color: '#166534' }}>
+                  <span style={{ fontWeight: 600 }}>必備防護：</span>
+                  <span>😷 防護口罩</span>
+                  <span>🥽 護目鏡</span>
+                  <span>🧤 橡膠手套</span>
+                  <span>👕 長袖長褲</span>
+                </div>
+              </div>
+
+              {/* 官方登記資料詳細列表 */}
+              <div style={{ borderTop: `1px solid ${EARTH.border}`, paddingTop: 12 }}>
+                {FIELD_META.map(({ key, label, hint, unit }) => {
+                  const value = selected[key];
+                  if (!value || value === '-') return null;
+                  const displayValue = unit && !String(value).includes(unit) ? `${value} ${unit}` : value;
+                  const hintText = typeof hint === 'function' ? hint(value) : hint;
+                  return (
+                    <div key={key} style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 4 : 17, padding: '10px 0', borderBottom: `1px solid ${EARTH.accentLight}` }}>
+                      <span style={{ color: EARTH.textMuted, fontSize: 15, minWidth: isMobile ? 'auto' : 125, fontWeight: 500 }}>
+                        {label}
+                        {hintText && <div style={{ fontSize: 12, color: EARTH.textMuted, opacity: 0.85, marginTop: 2 }}>（{hintText}）</div>}
+                      </span>
+                      <span style={{ color: EARTH.textDark, fontSize: 15, flex: 1, lineHeight: 1.6 }}>{displayValue}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div style={{ marginTop: 18, fontSize: 13, color: EARTH.textMuted, textAlign: 'right' }}>
+                資料來源：農業部動植物防疫檢疫署 2026 官方核准登記
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

@@ -2,8 +2,13 @@ import axios from 'axios';
 
 const getBaseURL = () => {
   if (process.env.REACT_APP_API_URL) return process.env.REACT_APP_API_URL;
-  if (typeof window !== 'undefined' && window.location && window.location.hostname) {
-    return `http://${window.location.hostname}:8000`;
+  if (typeof window !== 'undefined' && window.location) {
+    // 若在本地 React 開發模式 (port 3000)，指向同主機的 8000 埠
+    if (window.location.port === '3000') {
+      return `http://${window.location.hostname}:8000`;
+    }
+    // 若在公開網址或整合埠 (port 8000 / HTTPS Tunnel)，直接使用當前來源
+    return window.location.origin;
   }
   return 'http://localhost:8000';
 };

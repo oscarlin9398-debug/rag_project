@@ -184,7 +184,9 @@ export default function RAG() {
   const loading = pendingIds.includes(activeId);
   const [isFarmerMode, setIsFarmerMode] = useState(true);
   const [diagnosingImage, setDiagnosingImage] = useState(false);
-  const fileInputRef = useRef(null);
+  const [photoModalOpen, setPhotoModalOpen] = useState(false);
+  const cameraInputRef = useRef(null);
+  const albumInputRef = useRef(null);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [msgs]);
 
@@ -225,7 +227,8 @@ export default function RAG() {
         alert("照片辨識服務呼叫異常，請確認後端是否正在運行！");
       } finally {
         setDiagnosingImage(false);
-        if (fileInputRef.current) fileInputRef.current.value = '';
+        if (cameraInputRef.current) cameraInputRef.current.value = '';
+        if (albumInputRef.current) albumInputRef.current.value = '';
       }
     };
     reader.readAsDataURL(file);
@@ -420,9 +423,11 @@ ${msgText}
 
           {/* 輸入區：包含文字、📷 拍照問診按鈕與發送按鈕 */}
           <div style={{ display: 'flex', gap: isMobile ? 8 : 12, paddingBottom: isMobile ? 16 : 24, alignItems: 'center' }}>
-            <input type="file" ref={fileInputRef} accept="image/*" capture="environment" onChange={handleImageUpload} style={{ display: 'none' }} />
+            {/* 相機專用 input (capture="environment") 與 相簿挑選 input */}
+            <input type="file" ref={cameraInputRef} accept="image/*" capture="environment" onChange={handleImageUpload} style={{ display: 'none' }} />
+            <input type="file" ref={albumInputRef} accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
             
-            <button type="button" onClick={() => fileInputRef.current?.click()} disabled={loading || diagnosingImage}
+            <button type="button" onClick={() => setPhotoModalOpen(true)} disabled={loading || diagnosingImage}
               title="拍照或選擇葉片患部照片"
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
@@ -433,6 +438,31 @@ ${msgText}
               }}>
               📷 {diagnosingImage ? '辨識中' : '拍照問診'}
             </button>
+
+            {/* 拍照/選圖 彈出對話盒 */}
+            {photoModalOpen && (
+              <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 350, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+                onClick={() => setPhotoModalOpen(false)}>
+                <div onClick={e => e.stopPropagation()} style={{ background: '#FFFFFF', borderRadius: 16, padding: '24px 20px', width: '100%', maxWidth: 360, textAlign: 'center', boxShadow: '0 12px 32px rgba(0,0,0,0.25)' }}>
+                  <h3 style={{ margin: '0 0 8px', color: EARTH.accent, fontSize: 18, fontWeight: 700 }}>🌿 農作物病蟲害拍照診斷</h3>
+                  <p style={{ margin: '0 0 20px', color: EARTH.textMuted, fontSize: 14 }}>請選擇即時開啟手機鏡頭拍照，或從相簿中選取已拍好的葉片患部照片：</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <button type="button" onClick={() => { setPhotoModalOpen(false); cameraInputRef.current?.click(); }}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '14px', borderRadius: 12, background: '#2D6A4F', color: '#FFF', fontSize: 16, fontWeight: 600, border: 'none', cursor: 'pointer' }}>
+                      📸 開啟手機相機直接拍照
+                    </button>
+                    <button type="button" onClick={() => { setPhotoModalOpen(false); albumInputRef.current?.click(); }}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '14px', borderRadius: 12, background: '#E8F5E9', color: '#1B5E20', fontSize: 16, fontWeight: 600, border: '1px solid #A5D6A7', cursor: 'pointer' }}>
+                      🖼️ 從相簿挑選已存照片
+                    </button>
+                    <button type="button" onClick={() => setPhotoModalOpen(false)}
+                      style={{ padding: '10px', borderRadius: 10, background: 'transparent', color: '#6B7280', fontSize: 14, border: 'none', cursor: 'pointer', marginTop: 4 }}>
+                      取消
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend(input)}
               placeholder={isFarmerMode ? "輸入作物名稱（如芒果炭疽病、芭樂薊馬）或按左側拍照…" : "輸入用藥法規或作物查詢…"}
