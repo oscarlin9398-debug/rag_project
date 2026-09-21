@@ -220,10 +220,11 @@ export function ChatProvider({ children }) {
       if (finalConv) await persist(finalConv);
 
       setConversations(list => list.map(c => c.id === convId && finalConv ? finalConv : c));
-    } catch {
+    } catch (error) {
+      const errMsg = error.response?.data?.detail || error.message || '連線失敗，請確認後端是否正在運行。';
       const errConv = baseConv ? {
         ...baseConv,
-        messages: [...baseConv.messages, { role: 'bot', text: '連線失敗，請確認後端是否正在運行。', sources: [], isRefusal: true }],
+        messages: [...baseConv.messages, { role: 'bot', text: errMsg, sources: [], isRefusal: true }],
       } : null;
       if (errConv) await persist(errConv);
       setConversations(list => list.map(c => c.id === convId && errConv ? errConv : c));

@@ -654,8 +654,6 @@ def upsert_pesticide(req: PesticideUpsertRequest, username: str = Depends(get_cu
 
 @router.post("/api/ask", tags=["RAG 問答"], summary="農藥知識問答")
 async def ask(req: AskRequest):
-    if not OPENAI_API_KEY and not GEMINI_API_KEY:
-        raise HTTPException(500, "請在環境變數或 .env 中設定 OPENAI_API_KEY 或 GEMINI_API_KEY")
     try:
         q = req.question
         sub_questions = split_questions(q)
@@ -679,28 +677,44 @@ async def ask(req: AskRequest):
             sources = [s for r in results for s in r["sources"]]
             is_calc_question = any(r["is_calc_question"] for r in results)
 
-        # ── 多模型動態調度（支援 OpenAI 與 Google Gemini）────────────
+        # ── 多模型動態調度（支援 OpenAI、Google Gemini 與本地精準檢索降級模式）────
         answer = ""
         if OPENAI_API_KEY:
-            from langchain_openai import ChatOpenAI
-            from langchain_core.messages import SystemMessage, HumanMessage
-            model_name = "gpt-4o" if is_calc_question else "gpt-4o-mini"
-            llm = ChatOpenAI(model=model_name, temperature=0, openai_api_key=OPENAI_API_KEY)
-            resp = llm.invoke([
-                SystemMessage(content=SYSTEM_PROMPT),
-                HumanMessage(content=f"知識庫：\n{context}\n\n問題：{question_for_llm}"),
-            ])
-            answer = resp.content
-        elif GEMINI_API_KEY:
-            from google import genai
-            client = genai.Client(api_key=GEMINI_API_KEY)
-            gemini_model = "gemini-2.5-flash"
-            full_prompt = f"{SYSTEM_PROMPT}\n\n【知識庫資料】\n{context}\n\n【問題】\n{question_for_llm}"
-            resp = client.models.generate_content(
-                model=gemini_model,
-                contents=full_prompt,
-            )
-            answer = resp.text or ""
+            try:
+                from langchain_openai import ChatOpenAI
+                from langchain_core.messages import SystemMessage, HumanMessage
+                model_name = "gpt-4o" if is_calc_question else "gpt-4o-mini"
+                llm = ChatOpenAI(model=model_name, temperature=0, openai_api_key=OPENAI_API_KEY)
+                resp = llm.invoke([
+                    SystemMessage(content=SYSTEM_PROMPT),
+                    HumanMessage(content=f"知識庫：\n{context}\n\n問題：{question_for_llm}"),
+                ])
+                answer = resp.content
+            except Exception as e:
+                print(f"⚠️ OpenAI 調用降級：{e}")
+                answer = ""
+
+        if not answer and GEMINI_API_KEY:
+            try:
+                from google import genai
+                client = genai.Client(api_key=GEMINI_API_KEY)
+                gemini_model = "gemini-2.5-flash"
+                full_prompt = f"{SYSTEM_PROMPT}\n\n【知識庫資料】\n{context}\n\n【問題】\n{question_for_llm}"
+                resp = client.models.generate_content(
+                    model=gemini_model,
+                    contents=full_prompt,
+                )
+                answer = resp.text or ""
+            except Exception as e:
+                print(f"⚠️ Gemini 調用降級：{e}")
+                answer = ""
+
+        # ── 離線 / 零 Token 本地精準降級模式（保證隨時可問診）─────────
+        if not answer:
+            if not context or "知識庫無此資訊" in context:
+                answer = "知識庫目前查無此項官方登記資料，建議撥打農業部動植物防疫檢疫署免付費專線 0800-022228 洽詢專業植保技師。"
+            else:
+                answer = f"依據農業部動植物防疫檢疫署官方登記資料，為您檢索到合規資訊如下：\n\n{context}\n\n【田間實用速查】\n・施藥前請務必詳閱農藥標籤仿單，嚴格遵守上述稀釋倍數與安全採收期天數。\n・施藥作業請穿戴防護面罩、長袖工作服與橡膠手套，避免藥劑直接接觸皮膚。"
 
         REFUSAL_PHRASE = "知識庫無此資訊，建議撥打"
         is_refusal = REFUSAL_PHRASE in answer and len(answer) < 60
