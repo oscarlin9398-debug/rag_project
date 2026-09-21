@@ -973,7 +973,7 @@ async def vision_diagnose(req: VisionDiagnoseRequest):
 
     # 以視覺辨識之作物與病蟲害連動 RAG 混合檢索
     q_synthetic = f"{diagnosed_crop}{diagnosed_pest}推薦用藥"
-    rag_solution = answer_question(q_synthetic)
+    rag_solution = await ask(AskRequest(question=q_synthetic))
 
     return {
         "status": "success",
