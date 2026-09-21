@@ -18,6 +18,9 @@ from pydantic import BaseModel
 
 from db import get_db, CHROMA_PATH
 from auth import get_current_user
+from dotenv import load_dotenv
+
+load_dotenv()
 
 OPENAI_API_KEY    = os.environ.get("OPENAI_API_KEY", "")
 GEMINI_API_KEY    = os.environ.get("GEMINI_API_KEY", "")
