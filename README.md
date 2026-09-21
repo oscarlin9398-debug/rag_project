@@ -52,6 +52,79 @@ graph TD
 
 ---
 
+## 📊 資料庫實體關聯圖 (ER Diagram)
+
+本系統資料庫由單一 SQLite 實例 `pesticides.db` 統一管理，結構化關聯表與 Chroma 向量庫、BM25 全文索引協同運作：
+
+```mermaid
+erDiagram
+    USERS ||--o{ SESSIONS : "generates"
+    USERS ||--o{ CONVERSATIONS : "owns"
+    CONVERSATIONS ||--|{ CONVERSATION_MESSAGES : "contains"
+    
+    PESTICIDES }o--o{ RESIDUE_LIMITS : "matched_by_active_ingredient"
+    PESTICIDES }o--o{ REGULATIONS : "governed_by"
+    PESTICIDES }o--o{ QA_KNOWLEDGE : "explained_by"
+    
+    DATA_SYNC_METADATA ||--o{ PESTICIDES : "audits_and_tracks"
+
+    USERS {
+        int id PK
+        text username UK
+        text password_hash
+        text created_at
+    }
+    SESSIONS {
+        text token PK
+        text username FK
+        text created_at
+    }
+    CONVERSATIONS {
+        text id PK
+        text username FK
+        text title
+        int is_pinned
+    }
+    PESTICIDES {
+        int id PK
+        text 作物名稱
+        text 病蟲害名稱
+        text 農藥中文普通名稱
+        text 稀釋倍數
+        text 安全採收期_天
+    }
+    RESIDUE_LIMITS {
+        int id PK
+        text 農藥名稱與作物
+        text 限量_ppm
+    }
+    REGULATIONS {
+        int id PK
+        text 法規名稱
+        text 條號
+        text 條文內容
+    }
+    QA_KNOWLEDGE {
+        int id PK
+        text 問題
+        text 答案
+        text 分類
+    }
+```
+
+---
+
+## 🆚 與 Google 搜尋之四大核心差異
+
+| 評比維度 | Google 搜尋引擎 | 本專案智慧農藥 RAG 系統 | 法律與生命安全代價 |
+|---|---|---|---|
+| **合法性與禁藥過濾** | 容易搜到國外、舊新聞或民間農藥商廣告，推薦**已公告禁用或未核准禁藥**。 | **100% 官方合規檢驗**：即時與 52,183 筆官方最新登記藥證比對，未登記一律攔截。 | 違法使用禁藥處 **1~7 年有期徒刑**，併科 150~750 萬罰金。 |
+| **安全採收期 (PHI)** | 各農友論壇說法不一、相互矛盾，無法保證上市合格。 | 精準對接衛福部食藥署標準與防檢署法定天數，精確標示幾天能採收。 | 農藥殘留超標依《食安法》處 **15 萬至 2 億元**並全數銷毀。 |
+| **資訊幻覺與溯源** | 資訊片段破碎，常摻雜中國大陸用語（如把水稻白葉枯病講成白葉枯），無法驗證。 | 嚴格接地 (Grounded RAG)，強制附上官方核准證號與法規來源網址。 | 施用錯誤農藥導致作物藥害枯死，血本無歸。 |
+| **中毒急救與毒性** | 搜尋常跑出錯誤民間偏方（如誤喝農藥強行催吐或喝牛奶灌腸）。 | 嚴格依據**長庚毒物中心與防檢署官方急救 SOP**，明確標註禁止催吐與就醫攜帶仿單。 | 錯誤催吐極易導致食道二次化學灼傷或吸入性肺炎窒息死亡。 |
+
+---
+
 ## ✨ 核心亮點與創新優化 (Key Innovations)
 
 1. **混合檢索與 RRF 排名融合 (Hybrid Search with RRF)**：

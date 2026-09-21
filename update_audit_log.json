@@ -1,0 +1,11 @@
+[
+  {
+    "timestamp": "2026-09-21T11:26:02.870659",
+    "event_type": "CHECK_DATA_SOURCE",
+    "details": {
+      "source": "MOA_APHIA",
+      "current_records": 52183,
+      "message": "資料庫與防檢署開放資料版本校驗完成，現存紀錄全數有效合規"
+    }
+  }
+]
