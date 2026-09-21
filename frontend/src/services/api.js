@@ -1,5 +1,13 @@
 import axios from 'axios';
-const API = axios.create({ baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8000' });
+
+const getBaseURL = () => {
+  if (process.env.REACT_APP_API_URL) return process.env.REACT_APP_API_URL;
+  if (typeof window !== 'undefined' && window.location && window.location.hostname) {
+    return `http://${window.location.hostname}:8000`;
+  }
+  return 'http://localhost:8000';
+};
+const API = axios.create({ baseURL: getBaseURL() });
 
 // 每個請求自動帶上登入憑證（若已登入）
 API.interceptors.request.use((config) => {
