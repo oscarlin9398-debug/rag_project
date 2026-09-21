@@ -22,6 +22,7 @@ from auth import get_current_user
 OPENAI_API_KEY    = os.environ.get("OPENAI_API_KEY", "")
 GEMINI_API_KEY    = os.environ.get("GEMINI_API_KEY", "")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+GEMINI_MODEL      = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 
 # ── 載入 Jieba 農業與化學專業自定義詞庫 ───────────────────────
 USER_DICT_PATH = os.path.join(os.path.dirname(__file__), "user_dict.txt")
@@ -698,7 +699,7 @@ async def ask(req: AskRequest):
             try:
                 from google import genai
                 client = genai.Client(api_key=GEMINI_API_KEY)
-                gemini_model = "gemini-2.5-flash"
+                gemini_model = GEMINI_MODEL
                 full_prompt = f"{SYSTEM_PROMPT}\n\n【知識庫資料】\n{context}\n\n【問題】\n{question_for_llm}"
                 resp = client.models.generate_content(
                     model=gemini_model,
@@ -955,7 +956,7 @@ async def vision_diagnose(req: VisionDiagnoseRequest):
                 "請只回傳 JSON 格式：{\"crop\":\"作物名稱\",\"pest\":\"病害或蟲害名稱\",\"description\":\"病徵特徵描述\",\"confidence\":0.9}"
             )
             response = client.models.generate_content(
-                model="gemini-2.5-flash",
+                model=GEMINI_MODEL,
                 contents=[
                     genai.types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg"),
                     prompt_text
