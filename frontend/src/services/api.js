@@ -14,8 +14,9 @@ const getBaseURL = () => {
 };
 const API = axios.create({ baseURL: getBaseURL() });
 
-// 每個請求自動帶上登入憑證（若已登入）
+// 每個請求自動帶上穿透略過標頭與登入憑證（若已登入）
 API.interceptors.request.use((config) => {
+  config.headers['Bypass-Tunnel-Reminder'] = 'true';
   const token = localStorage.getItem('auth_token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
